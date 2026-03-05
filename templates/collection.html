@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}{{ collection.name if collection else 'Collection' }} - ChromaDB UI{% endblock %}
+
+{% block content %}
+{% if collection %}
+<div class="header">
+    <h1>{{ collection.name }}</h1>
+    <div class="header-info">
+        <span class="badge">{{ collection.count }} documents</span>
+    </div>
+</div>
+
+<div class="search-section">
+    <h3>Search</h3>
+    <form id="searchForm" onsubmit="searchDocuments(event)">
+        <div class="search-row">
+            <input type="text" id="searchQuery" placeholder="Enter search query..." class="search-input">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+    </form>
+    <div id="searchResults"></div>
+</div>
+
+<div class="documents-section">
+    <div class="section-header">
+        <h3>Documents</h3>
+        <button class="btn btn-primary" onclick="showAddModal()">Add Document</button>
+    </div>
+
+    {% if documents %}
+    <div class="documents-list">
+        {% for doc in documents %}
+        <div class="document-card">
+            <div class="document-header">
+                <span class="document-id">{{ doc.id }}</span>
+                <button class="btn btn-sm btn-danger" onclick="deleteDocument('{{ doc.id }}')">Delete</button>
+            </div>
+            <div class="document-content">
+                {{ doc.document[:500] }}{% if doc.document and doc.document|length > 500 %}...{% endif %}
+            </div>
+            {% if doc.metadata %}
+            <div class="document-metadata">
+                {% for key, value in doc.metadata.items() %}
+                <span class="meta-tag">{{ key }}: {{ value }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="{{ url_for('collection_view', name=collection.name, page=page-1) }}" class="btn">&laquo; Previous</a>
+        {% endif %}
+        <span class="page-info">Page {{ page }} of {{ total_pages }}</span>
+        {% if page < total_pages %}
+        <a href="{{ url_for('collection_view', name=collection.name, page=page+1) }}" class="btn">Next &raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="empty-state">
+        <p>No documents in this collection.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div id="addModal" class="modal">
+    <div class="modal-content">
+        <h2>Add Document</h2>
+        <form id="addForm" onsubmit="addDocument(event)">
+            <div class="form-group">
+                <label for="docContent">Content</label>
+                <textarea id="docContent" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="docId">ID (optional)</label>
+                <input type="text" id="docId">
+            </div>
+            <div class="form-group">
+                <label for="docMetadata">Metadata (JSON, optional)</label>
+                <textarea id="docMetadata" placeholder='{"key": "value"}'></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn" onclick="hideAddModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% else %}
+<div class="empty-state">
+    <p>Collection not found.</p>
+    <a href="{{ url_for('index') }}" class="btn">Back to Collections</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const collectionName = '{{ collection.name if collection else "" }}';
+
+function showAddModal() {
+    document.getElementById('addModal').style.display = 'block';
+}
+
+function hideAddModal() {
+    document.getElementById('addModal').style.display = 'none';
+}
+
+async function addDocument(e) {
+    e.preventDefault();
+    const content = document.getElementById('docContent').value;
+    const docId = document.getElementById('docId').value || null;
+    const metadataStr = document.getElementById('docMetadata').value;
+    let metadata = null;
+    
+    if (metadataStr) {
+        try {
+            metadata = JSON.parse(metadataStr);
+        } catch (err) {
+            alert('Invalid JSON in metadata');
+            return;
+        }
+    }
+
+    try {
+        const response = await fetch('/api/collections/' + encodeURIComponent(collectionName) + '/documents', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({document: content, id: docId, metadata})
+        });
+        
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const data = await response.json();
+            alert('Error: ' + data.error);
+        }
+    } catch (err) {
+        alert('Error adding document: ' + err.message);
+    }
+}
+
+async function deleteDocument(docId) {
+    if (!confirm('Are you sure you want to delete this document?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/collections/' + encodeURIComponent(collectionName) + '/documents/' + encodeURIComponent(docId), {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const data = await response.json();
+            alert('Error: ' + data.error);
+        }
+    } catch (err) {
+        alert('Error deleting document: ' + err.message);
+    }
+}
+
+async function searchDocuments(e) {
+    e.preventDefault();
+    const query = document.getElementById('searchQuery').value;
+    
+    if (!query) {
+        return;
+    }
+
+    const resultsDiv = document.getElementById('searchResults');
+    resultsDiv.innerHTML = '<p>Searching...</p>';
+
+    try {
+        const response = await fetch('/api/collections/' + encodeURIComponent(collectionName) + '/search', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({query, n_results: 10})
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            if (data.length === 0) {
+                resultsDiv.innerHTML = '<p>No results found.</p>';
+            } else {
+                let html = '<h4>Results</h4><div class="search-results-list">';
+                data.forEach(doc => {
+                    html += '<div class="document-card">';
+                    html += '<div class="document-header">';
+                    html += '<span class="document-id">' + doc.id + '</span>';
+                    if (doc.distance !== null) {
+                        html += '<span class="badge">Score: ' + (1 - doc.distance).toFixed(3) + '</span>';
+                    }
+                    html += '</div>';
+                    html += '<div class="document-content">' + (doc.document || '').substring(0, 300);
+                    if (doc.document && doc.document.length > 300) html += '...';
+                    html += '</div>';
+                    html += '</div>';
+                });
+                html += '</div>';
+                resultsDiv.innerHTML = html;
+            }
+        } else {
+            resultsDiv.innerHTML = '<p class="alert alert-error">Error: ' + data.error + '</p>';
+        }
+    } catch (err) {
+        resultsDiv.innerHTML = '<p class="alert alert-error">Error: ' + err.message + '</p>';
+    }
+}
+</script>
+{% endblock %}

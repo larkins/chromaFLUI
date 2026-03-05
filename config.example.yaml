@@ -1,0 +1,21 @@
+app:
+  name: ChromaDB Flask UI
+  debug: false
+
+server:
+  host: "0.0.0.0"
+  port: 5012
+
+chromadb:
+  path: "${CHROMADB_PATH}"
+  tenant: default_tenant
+  database: default_database
+
+ui:
+  items_per_page: 50
+  dark_mode: false
+  show_scores: true
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

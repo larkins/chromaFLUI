@@ -1,0 +1,16 @@
+[Unit]
+Description=ChromaDB Flask UI
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=__PROJECT_DIR__
+Environment="PATH=__PROJECT_DIR__/.venv/bin:/usr/bin"
+Environment="CONFIG_PATH=__PROJECT_DIR__/config.yaml"
+Environment="CHROMADB_PATH=__CHROMADB_PATH__"
+ExecStart=__PROJECT_DIR__/.venv/bin/python app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Collections - ChromaDB UI{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1>Collections</h1>
+    <button class="btn btn-primary" onclick="showCreateModal()">Create Collection</button>
+</div>
+
+{% if collections %}
+<div class="collections-grid">
+    {% for col in collections %}
+    <div class="collection-card">
+        <a href="{{ url_for('collection_view', name=col.name) }}">
+            <h3>{{ col.name }}</h3>
+            <div class="collection-meta">
+                <span class="badge">{{ col.count }} documents</span>
+            </div>
+            {% if col.metadata %}
+            <div class="collection-metadata">
+                {% for key, value in col.metadata.items() %}
+                <small>{{ key }}: {{ value }}</small>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </a>
+        <div class="collection-actions">
+            <button class="btn btn-sm btn-danger" onclick="deleteCollection('{{ col.name }}', event)">Delete</button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <p>No collections found.</p>
+    <p>Create a collection to get started.</p>
+</div>
+{% endif %}
+
+<div id="createModal" class="modal">
+    <div class="modal-content">
+        <h2>Create Collection</h2>
+        <form id="createForm" onsubmit="createCollection(event)">
+            <div class="form-group">
+                <label for="collectionName">Name</label>
+                <input type="text" id="collectionName" required>
+            </div>
+            <div class="form-group">
+                <label for="collectionMetadata">Metadata (JSON, optional)</label>
+                <textarea id="collectionMetadata" placeholder='{"key": "value"}'></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn" onclick="hideCreateModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showCreateModal() {
+    document.getElementById('createModal').style.display = 'block';
+}
+
+function hideCreateModal() {
+    document.getElementById('createModal').style.display = 'none';
+}
+
+async function createCollection(e) {
+    e.preventDefault();
+    const name = document.getElementById('collectionName').value;
+    const metadataStr = document.getElementById('collectionMetadata').value;
+    let metadata = null;
+    
+    if (metadataStr) {
+        try {
+            metadata = JSON.parse(metadataStr);
+        } catch (err) {
+            alert('Invalid JSON in metadata');
+            return;
+        }
+    }
+
+    try {
+        const response = await fetch('/api/collections', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, metadata})
+        });
+        
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const data = await response.json();
+            alert('Error: ' + data.error);
+        }
+    } catch (err) {
+        alert('Error creating collection: ' + err.message);
+    }
+}
+
+async function deleteCollection(name, e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!confirm('Are you sure you want to delete collection "' + name + '"?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/collections/' + encodeURIComponent(name), {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const data = await response.json();
+            alert('Error: ' + data.error);
+        }
+    } catch (err) {
+        alert('Error deleting collection: ' + err.message);
+    }
+}
+</script>
+{% endblock %}
