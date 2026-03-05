@@ -74,3 +74,6 @@ logs/
 
 # ChromaDB (if running local tests)
 test_chromadb/
+
+# OpenCode sessions
+session-ses*
