@@ -190,7 +190,7 @@ def api_delete_collection(name: str) -> tuple[Any, int]:
 
 if __name__ == "__main__":
     server_config = config.get("server", {})
-    host = server_config.get("host", "0.0.0.0")
+    host = server_config.get("host", "127.0.0.1")
     port = server_config.get("port", 5000)
     debug = config.get("app", {}).get("debug", False) or os.environ.get(
         "FLASK_DEBUG", ""
